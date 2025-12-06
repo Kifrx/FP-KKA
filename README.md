@@ -16,62 +16,33 @@
 ### 1. Procedural Level Generation (No Database!)
 Conventional puzzles use static level databases, which can get boring. We implemented a **Level Generator** that creates unique levels in real-time.
 * **Guaranteed Solvability:** No "impossible" levels. [cite_start]Every generated puzzle has a valid solution[cite: 111].
-* [cite_start]**Dynamic Difficulty:** The complexity is scaled based on the recursion depth of the generator[cite: 190].
+* **Dynamic Difficulty:** The complexity is scaled based on the recursion depth of the generator[cite: 190].
 
 ### 2. Smart Hint System
 Stuck? Our hint system doesn't just give you a random legal move. [cite_start]It calculates the **optimal path** to the solution and guides you one step at a time[cite: 112].
 
 ### 3. Strategic Gameplay
 * **Extra Tube Mode:** Add an empty bottle if you are cornered.
-* [cite_start]**Trade-off System:** Using Hints or Extra Tubes costs "Stars" (score), forcing players to think before assisting[cite: 194].
+* **Trade-off System:** Using Hints or Extra Tubes costs "Stars" (score), forcing players to think before assisting[cite: 194].
 
 ---
 
 ## 🧠 The AI Behind It
 
-[cite_start]This project models the game as a **State-Space Search** problem[cite: 130]. We utilize two core algorithms:
+This project models the game as a **State-Space Search** problem[cite: 130]. We utilize two core algorithms:
 
 ### A. Reverse BFS (Breadth-First Search) - *For Level Generation*
-[cite_start]Instead of creating a random mess and checking if it's solvable (which risks deadlocks), we use **Reverse Engineering** logic[cite: 156]:
-1.  [cite_start]**Start:** Begin with a solved state (all bottles sorted)[cite: 152].
-2.  [cite_start]**Action:** Simulate "pouring backward" (mixing colors) using BFS[cite: 153].
-3.  [cite_start]**Stop:** Stop when the desired difficulty depth is reached[cite: 154].
+Instead of creating a random mess and checking if it's solvable (which risks deadlocks), we use **Reverse Engineering** logic[cite: 156]:
+1.  **Start:** Begin with a solved state (all bottles sorted)[cite: 152].
+2.  **Action:** Simulate "pouring backward" (mixing colors) using BFS[cite: 153].
+3.  **Stop:** Stop when the desired difficulty depth is reached[cite: 154].
 4.  **Result:** The final mixed state becomes the puzzle for the player.
 
 ### B. A* (A-Star) Search - *For Smart Hints*
 To find the best move, we use the A* algorithm with the cost function:
 $$f(n) = g(n) + h(n)$$
-* [cite_start]$g(n)$: Cost of the path so far[cite: 165].
-* $h(n)$: **Heuristic Function**. [cite_start]We calculate a "Chaos Score" based on how mixed the colors are within a single bottle[cite: 168].
-
----
-
-## 📸 Screenshots & Flowcharts
-
-| Game Interface | Algorithm Flowchart |
-|:---:|:---:|
-| *(Place your game screenshot here)* | *(Place the flowchart from your report here)* |
-
----
-
-## 🛠️ Installation & How to Run
-
-1.  Clone the repository:
-    ```bash
-    git clone [https://github.com/username/water-sort-ai.git](https://github.com/username/water-sort-ai.git)
-    ```
-2.  Navigate to the project directory:
-    ```bash
-    cd water-sort-ai
-    ```
-3.  Install dependencies (if any):
-    ```bash
-    pip install -r requirements.txt
-    ```
-4.  Run the game:
-    ```bash
-    python main.py
-    ```
+* $g(n)$: Cost of the path so far.
+* $h(n)$: **Heuristic Function**. We calculate a "Chaos Score" based on how mixed the colors are within a single bottle[cite: 168].
 
 ---
 
