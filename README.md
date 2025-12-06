@@ -1,3 +1,38 @@
+# Detail File 
+
+## Puzzle.py
+
+- BFS Backtracking
+- Tampilan awal game 
+
+## Puzzle-revision-1.py
+
+- A* Hint
+- Bintang
+  
+## Puzzle-revision-2.py
+
+- UI Level
+- Skor
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+---
+
 # 🧪 Water Sort Puzzle with Artificial Intelligence
 
 ![Project Status](https://img.shields.io/badge/Status-Active-brightgreen)
