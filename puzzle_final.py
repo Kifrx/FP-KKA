@@ -35,9 +35,9 @@ BOTOL_CAPACITY = 4
 LEVEL_CONFIG = {
     1: {"colors": 3, "empty": 1, "depth": 12},
     2: {"colors": 4, "empty": 1, "depth": 25},
-    3: {"colors": 5, "empty": 1, "depth": 40},
+    3: {"colors": 5, "empty": 2, "depth": 40},
     4: {"colors": 6, "empty": 1, "depth": 55},
-    5: {"colors": 7, "empty": 1, "depth": 70}
+    5: {"colors": 7, "empty": 2, "depth": 70}
 }
 
 # ==========================================
