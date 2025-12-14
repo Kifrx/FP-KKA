@@ -40,8 +40,8 @@
 ![Language](https://img.shields.io/badge/Language-Python-yellow) > **Final Project - Group 5 (KKA C)** > A smarter implementation of the classic Water Sort Puzzle. Unlike conventional games with static levels, this project utilizes **Artificial Intelligence** to generate guaranteed solvable levels procedurally and provides optimal hints using pathfinding algorithms.
 
 ## 👥 The Team (Group 5)
-* **Syah Amin Zikri** (5025241195)
-* **Aziz Adi Pramana** (5025241197)
+* **Syah Amin Zikri** (5025241197)
+* **Aziz Adi Pramana** (5025241195)
 * **M. Sholihuddin Rizky** (5025241171)
 
 ---
