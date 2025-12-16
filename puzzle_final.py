@@ -496,6 +496,9 @@ def draw_game_interface():
 
         # TAMPILAN SCORE
 
+        hint_out = font.render(f"HINT USED: {hint_used}", True, "red")
+        screen.blit(hint_out, (400, 400))
+        
         score_text = font.render(f"SCORE: {player_score}", True, "white")
         screen.blit(score_text, (400, 350))
 
