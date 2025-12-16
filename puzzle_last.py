@@ -161,18 +161,18 @@ class WaterSortGenerator:
         moves = []
         n = len(state)
         for i in range(n):
-            if not state[i]: continue # Src harus ada isi
+            if not state[i]: continue #
             for j in range(n):
                 if i == j: continue
-                if len(state[j]) >= BOTOL_CAPACITY: continue # Dst jangan penuh
-                
+                if len(state[j]) >= BOTOL_CAPACITY: continue 
+            
                 # Taboo Move: Jangan kembalikan air ke tempat asal segera
                 if last_move and last_move == (j, i):
                     continue
                 
-                # Agar susah: Jangan tuang ke warna sama (kecuali dst kosong)
+                #  Jangan tuang ke warna sama (kecuali dst kosong)
                 if state[j] and state[j][-1] == state[i][-1]:
-                    if random.random() > 0.1: continue # 90% skip
+                    if random.random() > 0.1: continue 
                 
                 moves.append((i, j))
         return moves
@@ -191,7 +191,7 @@ class WaterSortGenerator:
         
         # Loop BFS
         while queue:
-            current_state, depth, last_move = queue.popleft() # Ambil dari DEPAN (Sifat BFS)
+            current_state, depth, last_move = queue.popleft() 
             
             # Jika kedalaman target tercapai, ambil state ini
             if depth >= self.depth:
@@ -206,15 +206,10 @@ class WaterSortGenerator:
                 final_state = current_state
                 break
                 
-            # --- OPTIMASI BFS AGAR TIDAK CRASH ---
-            # Kita tidak memasukkan SEMUA tetangga (karena akan jadi jutaan node).
-            # Kita pilih 1 tetangga acak untuk dimasukkan ke Queue.
-            # Ini secara teknis tetap BFS (pakai Queue), tapi jalurnya linear (Randomized).
-            
             chosen_move = random.choice(moves)
             i, j = chosen_move
             
-            # Fragmentasi (Pecah warna biar susah)
+            # Fragmentasi
             new_state = [list(t) for t in current_state]
             src, dst = new_state[i], new_state[j]
             
@@ -233,7 +228,7 @@ class WaterSortGenerator:
             for _ in range(trf):
                 dst.append(src.pop())
             
-            # Masukkan ke Queue (Belakang)
+            # Masukkan ke Queue 
             queue.append((new_state, depth + 1, chosen_move))
             
             # Update final state setiap langkah
@@ -333,7 +328,7 @@ def calculate_stars(final_score):
     elif final_score > 600: return 4
     elif final_score > 400: return 3
     elif final_score > 200: return 2
-    else: return 1 # 0-200 tetap dapat bintang 1
+    else: return 1 
 
 # ==========================================
 # 5. DRAWING & MAIN LOOP
@@ -352,7 +347,6 @@ def draw_game():
     score_txt = font.render(f"Score: {score}", True, col_score)
     screen.blit(score_txt, (20, 70))
     
-    # Info Algoritma (Biar Dosen Lihat)
     algo_txt = font.render("Generator: BFS | Hint: A*", True, (100, 255, 100))
     screen.blit(algo_txt, (20, 100))
     
@@ -407,7 +401,7 @@ def draw_game():
         draw_text_center("LEVEL COMPLETED!", HEIGHT//2 - 120, 'green', large_font)
         draw_text_center(f"Final Score: {score}", HEIGHT//2 - 70)
         
-        # Gambar Bintang Visual
+        # Bintang Visual
         star_size = 35
         total_width = stars * (star_size * 2 + 10)
         start_star_x = WIDTH//2 - total_width // 2 + star_size
@@ -524,3 +518,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
