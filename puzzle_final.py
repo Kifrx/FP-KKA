@@ -659,7 +659,7 @@ def main():
                             print("Hint: tidak ditemukan atau sudah rapi")
                         else:
                             print(f"Hint: tuang dari {hint_move[0]} ke {hint_move[1]}")
-                            player_score -= 5   # penalti pakai hint
+                            player_score -= 100   # penalti pakai hint
                             hint_used += 1
 
                 if event.type == pygame.MOUSEBUTTONDOWN and not game_won:
@@ -684,9 +684,9 @@ def main():
                                 # cek victory dan set stars
                                 if check_victory():
                                     game_won = True
-                                    if player_score > 850:
+                                    if player_score > 850 and hint_used == 0:
                                         stars = 3
-                                    elif player_score > 650:
+                                    elif player_score > 650 and hint_used <= 3:
                                         stars = 2
                                     else:
                                         stars = 1
