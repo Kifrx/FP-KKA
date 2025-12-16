@@ -497,8 +497,11 @@ def draw_game_interface():
         # TAMPILAN SCORE
 
         hint_out = font.render(f"HINT USED: {hint_used - 1}", True, "white")
-        screen.blit(hint_out, (395, 400))
+        screen.blit(hint_out, (395, 390))
         
+        hint_out = font.render(f"MOVE: {move_count}", True, "white")
+        screen.blit(hint_out, (410, 420))
+
         score_text = font.render(f"SCORE: {player_score}", True, "white")
         screen.blit(score_text, (400, 350))
 
@@ -571,7 +574,7 @@ def handle_move(src_idx, dst_idx):
         dst.append(src.pop())
 
     # --- PENALTI SKOR ---
-    player_score -= 1     # setiap move sah mengurangi skor
+    player_score -= 10     # setiap move sah mengurangi skor
     move_count += 1       # jika mau menampilkan jumlah langkah
 
 
@@ -580,7 +583,7 @@ def handle_move(src_idx, dst_idx):
 # ==========================================
 
 def main():
-    global current_level, selected_tube, tubes, game_won, hint_move, hint_used, stars, ui_state, player_score
+    global current_level, selected_tube, tubes, game_won, hint_move, hint_used, stars, ui_state, player_score, move_count
 
     run = True
     # start at menu
