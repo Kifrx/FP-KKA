@@ -1,521 +1,679 @@
 import pygame
 import random
 import copy
-import heapq
 import time
-import math
 from collections import deque
+import heapq
 
-# --- INISIALISASI ---
+# --- INISIALISASI PYGAME ---
 pygame.init()
 
-WIDTH, HEIGHT = 900, 600
-screen = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("Water Sort: Generator BFS & Hint A*")
-
-# Font & Clock
+WIDTH = 900
+HEIGHT = 600
+screen = pygame.display.set_mode([WIDTH, HEIGHT])
+pygame.display.set_caption('Water Sort Puzzle - Final BFS Project (Fixed Hint)')
 font = pygame.font.Font('freesansbold.ttf', 20)
 large_font = pygame.font.Font('freesansbold.ttf', 40)
-clock = pygame.time.Clock()
+timer = pygame.time.Clock()
 FPS = 60
 
-# --- COLORS ---
+# --- WARNA RGB ---
 COLOR_MAP = {
-    1: (220, 20, 60),    # Crimson
-    2: (65, 105, 225),   # Royal Blue
-    3: (50, 205, 50),    # Lime Green
-    4: (255, 215, 0),    # Gold
-    5: (138, 43, 226),   # Blue Violet
+    1: (220, 20, 60),    # Crimson (Merah)
+    2: (65, 105, 225),   # Royal Blue (Biru)
+    3: (50, 205, 50),    # Lime Green (Hijau)
+    4: (255, 215, 0),    # Gold (Kuning)
+    5: (138, 43, 226),   # Blue Violet (Ungu)
     6: (255, 140, 0),    # Dark Orange
     7: (0, 255, 255),    # Cyan
     8: (255, 105, 180),  # Hot Pink
-    9: (128, 128, 128)   # Gray
+    9: (169, 169, 169)   # Dark Gray
 }
+
 
 BOTOL_CAPACITY = 4
-
-# --- KONFIGURASI LEVEL ---
 LEVEL_CONFIG = {
-    1: {"colors": 3, "empty": 1, "depth": 25}, 
-    2: {"colors": 4, "empty": 1, "depth": 45}, 
-    3: {"colors": 5, "empty": 2, "depth": 75},
-    4: {"colors": 6, "empty": 2, "depth": 110}, 
-    5: {"colors": 7, "empty": 2, "depth": 150}  
+    1: {"colors": 3, "empty": 2, "depth": 12},
+    2: {"colors": 4, "empty": 2, "depth": 25},
+    3: {"colors": 5, "empty": 2, "depth": 40},
+    4: {"colors": 6, "empty": 2, "depth": 55},
+    5: {"colors": 7, "empty": 2, "depth": 70}
 }
 
 # ==========================================
-# 1. CORE LOGIC (Aturan Main)
+# CLASS GENERATOR: REVERSE BFS WITH CHAOS PRUNING
 # ==========================================
-
-def state_to_key(state):
-    return tuple(tuple(t) for t in state)
-
-def is_goal_state(state):
-    for t in state:
-        if not t: continue
-        if len(t) != BOTOL_CAPACITY: return False
-        if len(set(t)) != 1: return False
-    return True
-
-def valid_moves_from(state):
-    moves = []
-    n = len(state)
-    for i in range(n):
-        if not state[i]: continue 
-        for j in range(n):
-            if i == j: continue
-            if len(state[j]) >= BOTOL_CAPACITY: continue
-            if not state[j] or state[j][-1] == state[i][-1]:
-                moves.append((i, j))
-    return moves
-
-def apply_move(state, move):
-    i, j = move
-    new_state = [list(t) for t in state]
-    src, dst = new_state[i], new_state[j]
-    if not src: return new_state
-    color = src[-1]
-    count = 0
-    for k in range(len(src)-1, -1, -1):
-        if src[k] == color: count += 1
-        else: break
-    space = BOTOL_CAPACITY - len(dst)
-    amount = min(count, space)
-    for _ in range(amount):
-        dst.append(src.pop())
-    return new_state
-
-# ==========================================
-# 2. HINT SYSTEM: A* (A-STAR)
-# ==========================================
-
-def get_heuristic_score(state):
-    """Heuristik untuk A*: Menghitung tingkat kekacauan"""
-    score = 0
-    for tube in state:
-        if not tube: continue
-        for i in range(len(tube) - 1):
-            if tube[i] != tube[i+1]: score += 3 
-        if len(tube) < BOTOL_CAPACITY: score += 1
-        if len(tube) > 0 and tube[0] != tube[-1]: score += 2
-    return score
-
-def astar_find_hint(start_state):
-    """
-    ALGORITMA A* (A-STAR) untuk mencari HINT.
-    Menggunakan Priority Queue (heapq).
-    """
-    if is_goal_state(start_state): return None
-    
-    pq = []
-    h = get_heuristic_score(start_state)
-    # Tuple: (f_score, g_score, state, path)
-    heapq.heappush(pq, (h, 0, start_state, [])) 
-    
-    visited = {state_to_key(start_state): 0}
-    max_nodes = 5000
-    nodes = 0
-
-    while pq:
-        f, g, cur, path = heapq.heappop(pq)
-        nodes += 1
-        
-        if is_goal_state(cur): return path[0] if path else None
-        if nodes > max_nodes: return None
-
-        for m in valid_moves_from(cur):
-            nxt = apply_move(cur, m)
-            nxt_key = state_to_key(nxt)
-            new_g = g + 1
-            
-            # Logic A*: f(n) = g(n) + h(n)
-            if nxt_key not in visited or new_g < visited[nxt_key]:
-                visited[nxt_key] = new_g
-                new_h = get_heuristic_score(nxt)
-                heapq.heappush(pq, (new_g + new_h * 1.5, new_g, nxt, path + [m]))
-    return None
-
-# ==========================================
-# 3. GENERATOR SYSTEM: BFS (Breadth-First Search)
-# ==========================================
-
 class WaterSortGenerator:
     def __init__(self, level):
-        cfg = LEVEL_CONFIG.get(level, LEVEL_CONFIG[5])
-        self.colors = cfg["colors"]
-        self.empty = cfg["empty"]
-        self.depth = cfg["depth"]
+        config = LEVEL_CONFIG.get(level, LEVEL_CONFIG[5])
+        self.level = level
+        self.num_colors = config["colors"]
+        self.num_empty = config["empty"]
 
-    def create_goal(self):
-        tubes = []
-        cols = list(COLOR_MAP.keys())[:self.colors]
-        random.shuffle(cols)
-        for c in cols:
-            tubes.append([c] * BOTOL_CAPACITY)
-        for _ in range(self.empty):
-            tubes.append([])
-        return tubes
-    
-    def chaotic_reverse_moves(self, state, last_move):
-        """Mencari langkah pengacakan (Reverse Move)"""
-        moves = []
-        n = len(state)
-        for i in range(n):
-            if not state[i]: continue #
-            for j in range(n):
-                if i == j: continue
-                if len(state[j]) >= BOTOL_CAPACITY: continue 
-            
-                # Taboo Move: Jangan kembalikan air ke tempat asal segera
-                if last_move and last_move == (j, i):
-                    continue
-                
-                #  Jangan tuang ke warna sama (kecuali dst kosong)
-                if state[j] and state[j][-1] == state[i][-1]:
-                    if random.random() > 0.1: continue 
-                
-                moves.append((i, j))
-        return moves
+        self.target_depth = config["depth"] + 10
 
-    def generate(self):
-        """
-        ALGORITMA BFS (Breadth-First Search) untuk GENERATOR.
-        Menggunakan Queue (deque).
-        """
-        goal = self.create_goal()
-        
-        # BFS Queue: menyimpan (state, depth, last_move)
-        queue = deque([(goal, 0, None)])
-        
-        final_state = goal
-        
-        # Loop BFS
+    def create_goal_state(self):
+        """Buat Botol Rapi (Goal)"""
+        bottles = []
+        available_colors = list(COLOR_MAP.keys())[:self.num_colors]
+        random.shuffle(available_colors)
+
+        for color in available_colors:
+            bottles.append([color] * BOTOL_CAPACITY)
+        for _ in range(self.num_empty):
+            bottles.append([])
+        return bottles
+
+    def get_chaos_score(self, src_tube, dst_tube):
+        if not src_tube:
+            return 0
+
+        color_src = src_tube[-1]
+
+        # Kasus 1: Nuang ke botol kosong
+        if not dst_tube:
+            return 5 if self.level < 3 else 1
+
+        color_dst = dst_tube[-1]
+
+        # Kasus 2: Nuang ke warna BEDA (CHAOS!)
+        if color_src != color_dst:
+            return 10  # Prioritas TERTINGGI
+
+        return 0
+
+    def generate_with_bfs(self):
+        goal_state = self.create_goal_state()
+
+        queue = deque([(goal_state, 0, None)])
+
+        final_state = goal_state
+        visited_count = 0
+        max_visit = 5000  # Safety break
+
+        print(f"BFS Generating Level {self.level} (Target Depth: {self.target_depth})...")
+
         while queue:
-            current_state, depth, last_move = queue.popleft() 
-            
-            # Jika kedalaman target tercapai, ambil state ini
-            if depth >= self.depth:
+            current_state, depth, last_move = queue.popleft()
+            visited_count += 1
+
+            if depth > 0:
                 final_state = current_state
-                break
-            
-            # Cari tetangga (Next States)
-            moves = self.chaotic_reverse_moves(current_state, last_move)
-            
-            if not moves:
-                # Jika macet, ambil state terakhir yang valid
-                final_state = current_state
-                break
-                
-            chosen_move = random.choice(moves)
-            i, j = chosen_move
-            
-            # Fragmentasi
-            new_state = [list(t) for t in current_state]
-            src, dst = new_state[i], new_state[j]
-            
-            # Hitung jumlah air yang bisa dipindah
-            src_color = src[-1]
-            amount_avail = 0
-            for k in range(len(src)-1, -1, -1):
-                if src[k] == src_color: amount_avail += 1
-                else: break
-            
-            space = BOTOL_CAPACITY - len(dst)
-            max_trf = min(amount_avail, space)
-            
-            # Random amount transfer
-            trf = random.randint(1, max_trf)
-            for _ in range(trf):
-                dst.append(src.pop())
-            
-            # Masukkan ke Queue 
-            queue.append((new_state, depth + 1, chosen_move))
-            
-            # Update final state setiap langkah
-            final_state = new_state
+
+            if depth >= self.target_depth or visited_count > max_visit:
+                return current_state
+
+            # --- EXPAND NODE (Cari Anak) ---
+            potential_moves = []
+
+            for i in range(len(current_state)):
+                for j in range(len(current_state)):
+                    if i == j:
+                        continue
+
+                    src, dst = current_state[i], current_state[j]
+
+                    # Syarat Valid Reverse
+                    if len(src) > 0 and len(dst) < BOTOL_CAPACITY:
+                        if last_move and last_move == (j, i):
+                            continue
+
+                        # Hitung Skor Chaos
+                        score = self.get_chaos_score(src, dst)
+
+                        # PRUNING: Hanya ambil gerakan yang punya skor chaos > 0
+                        if score > 0:
+                            potential_moves.append((score, i, j))
+
+            # Kalau tidak ada gerakan chaos, cari gerakan apa saja
+            if not potential_moves:
+                for i in range(len(current_state)):
+                    for j in range(len(current_state)):
+                        if i == j:
+                            continue
+                        if len(current_state[i]) > 0 and len(current_state[j]) < BOTOL_CAPACITY:
+                            if last_move and last_move == (j, i):
+                                continue
+                            potential_moves.append((1, i, j))
+
+            if not potential_moves:
+                continue
+
+            # Acak sedikit biar gak deterministik
+            random.shuffle(potential_moves)
+
+            # Urutkan berdasarkan skor chaos tertinggi
+            potential_moves.sort(key=lambda x: x[0], reverse=True)
+
+            # Ambil 1 langkah terbaik (Greedy-BFS)
+            best_move = potential_moves[0]
+            score, src_idx, dst_idx = best_move
+
+            # Eksekusi State Baru
+            new_state = copy.deepcopy(current_state)
+            water = new_state[src_idx].pop()
+            new_state[dst_idx].append(water)
+
+            # Masukkan ke Queue Belakang
+            queue.append((new_state, depth + 1, (src_idx, dst_idx)))
 
         return final_state
 
+
 # ==========================================
-# 4. GLOBAL & UI SETUP
+# 2. LOGIKA GAMEPLAY & VISUALISASI
 # ==========================================
 
 current_level = 1
 tubes = []
 initial_tubes = []
 selected_tube = None
-hint_move = None
+hint_move = None  # (src_idx, dst_idx) for visual hint
 game_won = False
 loading = True
-score = 0
+
+player_score = 0
+move_count = 0
+
+# Star & hint usage
+hint_used = 0
 stars = 0
+
+# UI states: 'menu', 'level_select', 'playing'
 ui_state = 'menu'
 
-# Validator Sederhana (Greedy) untuk memastikan level playable
-def fast_solve_validation(state):
-    if is_goal_state(state): return True
-    pq = []
-    heapq.heappush(pq, (get_heuristic_score(state), 0, state))
-    visited = {state_to_key(state)}
+# ---------- A* HINT FUNCTIONS ----------
+
+def state_to_key(state):
+    return tuple(tuple(t) for t in state)
+
+
+def is_goal_state(state):
+    for tube in state:
+        if len(tube) == 0:
+            continue
+        if len(tube) < BOTOL_CAPACITY:
+            return False
+        first = tube[0]
+        for c in tube:
+            if c != first:
+                return False
+    return True
+
+
+def heuristic(state):
+    h = 0
+    for tube in state:
+        if not tube:
+            continue
+        for i in range(len(tube) - 1):
+            if tube[i] != tube[i + 1]:
+                h += 1
+        # if tube not full, penalize a bit (we want full same-colored tubes)
+        if len(tube) < BOTOL_CAPACITY:
+            h += (BOTOL_CAPACITY - len(tube))
+    return h
+
+
+def valid_moves_from(state):
+    moves = []
+    n = len(state)
+    for i in range(n):
+        for j in range(n):
+            if i == j:
+                continue
+            src = state[i]
+            dst = state[j]
+            if len(src) == 0 or len(dst) >= BOTOL_CAPACITY:
+                continue
+            src_color = src[-1]
+            if len(dst) > 0 and dst[-1] != src_color:
+                continue
+            moves.append((i, j))
+    return moves
+
+
+def apply_move(state, move):
+    i, j = move
+    new_state = [list(t) for t in state]
+    if len(new_state[i]) == 0:
+        return None
+    src_color = new_state[i][-1]
+    amount = 0
+    for k in range(len(new_state[i]) - 1, -1, -1):
+        if new_state[i][k] == src_color:
+            amount += 1
+        else:
+            break
+    space = BOTOL_CAPACITY - len(new_state[j])
+    final_amount = min(amount, space)
+    for _ in range(final_amount):
+        new_state[j].append(new_state[i].pop())
+    return new_state
+
+
+
+def astar_find_hint(start_state, time_limit=0.8, max_nodes=20000):
+    start_key = state_to_key(start_state)
+    if is_goal_state(start_state):
+        return None
+
+    t0 = time.time()
+
+    open_heap = []
+    # heap items: (f, g, key, state, parent_key, move_from_parent)
+    h0 = heuristic(start_state)
+    heapq.heappush(open_heap, (h0, 0, start_key, start_state, None, None))
+
+    came_from = {}
+    g_score = {start_key: 0}
+
     nodes = 0
-    while pq and nodes < 5000:
-        _, _, cur = heapq.heappop(pq)
+
+    while open_heap:
+        if time.time() - t0 > time_limit:
+            break
+        f, g, key, state, parent_key, move = heapq.heappop(open_heap)
         nodes += 1
-        if is_goal_state(cur): return True
-        for m in valid_moves_from(cur):
-            nxt = apply_move(cur, m)
-            k = state_to_key(nxt)
-            if k not in visited:
-                visited.add(k)
-                heapq.heappush(pq, (get_heuristic_score(nxt), nodes, nxt))
-    return False
+        if nodes > max_nodes:
+            break
 
-def draw_text_center(text, y, color='white', font_obj=font):
-    obj = font_obj.render(str(text), True, color)
-    rect = obj.get_rect(center=(WIDTH//2, y))
-    screen.blit(obj, rect)
+        if key in came_from:
+            continue
 
-# Fungsi Gambar Bintang
-def draw_star(surface, x, y, size, color):
-    points = []
-    for i in range(10):
-        angle = -math.pi / 2 + i * math.pi / 5 
-        radius = size if i % 2 == 0 else size * 0.4
-        px = x + radius * math.cos(angle)
-        py = y + radius * math.sin(angle)
-        points.append((px, py))
-    pygame.draw.polygon(surface, color, points)
-    pygame.draw.polygon(surface, (200, 150, 0), points, 2)
+        came_from[key] = (parent_key, move)
+
+        if is_goal_state(state):
+            # reconstruct path
+            path_moves = []
+            cur = key
+            while came_from[cur][0] is not None:
+                pk, mv = came_from[cur]
+                path_moves.append(mv)
+                cur = pk
+            path_moves.reverse()
+            if path_moves:
+                return path_moves[0]
+            else:
+                return None
+
+        for mv in valid_moves_from(state):
+            new_state = apply_move(state, mv)
+            if new_state is None:
+                continue
+            nk = state_to_key(new_state)
+            tentative_g = g + 1
+            if tentative_g < g_score.get(nk, float('inf')):
+                g_score[nk] = tentative_g
+                h = heuristic(new_state)
+                heapq.heappush(open_heap, (tentative_g + h, tentative_g, nk, new_state, key, mv))
+
+    # Fallback Greedy
+    best = None
+    best_h = float('inf')
+    for mv in valid_moves_from(start_state):
+        s = apply_move(start_state, mv)
+        if s is None:
+            continue
+        h = heuristic(s)
+        if h < best_h:
+            best_h = h
+            best = mv
+    return best
+
+
+# ==========================================
+# UI & GAME FUNCTIONS
+# ==========================================
 
 def setup_level(level):
-    global tubes, initial_tubes, current_level, game_won, loading, score, stars, hint_move
-    
-    current_level = level
+    global tubes, initial_tubes, game_won, loading, hint_move, hint_used, stars, current_level, player_score, move_count
+    player_score = 1000
+    move_count = 0
     loading = True
-    game_won = False
+    draw_loading(level)
+    move_count = 0
     hint_move = None
+    
+    hint_used = 0 # Reset hint counter ke 0 setiap level baru
+    
     stars = 0
-    score = 1000 
-    
-    screen.fill((20, 20, 30))
-    draw_text_center(f"GENERATING LEVEL {level} (BFS)...", HEIGHT//2, 'cyan', large_font)
-    pygame.display.flip()
-
+    current_level = level
     gen = WaterSortGenerator(level)
-    best_puzzle = None
-    max_complexity = -1
-    
-    attempts = 15 
-    for _ in range(attempts):
-        candidate = gen.generate() # Panggil BFS Generator
-        
-        # Skip jika terlalu mudah
-        neat_count = sum(1 for t in candidate if len(t)==4 and len(set(t))==1)
-        if level > 1 and neat_count >= 3: continue 
-        
-        if fast_solve_validation(candidate):
-            complexity = get_heuristic_score(candidate)
-            if complexity > max_complexity:
-                max_complexity = complexity
-                best_puzzle = candidate
-    
-    tubes = best_puzzle if best_puzzle else gen.create_goal()
+    tubes = gen.generate_with_bfs()
+
     initial_tubes = copy.deepcopy(tubes)
+    game_won = False
     loading = False
 
-def calculate_stars(final_score):
-    if final_score > 800: return 5
-    elif final_score > 600: return 4
-    elif final_score > 400: return 3
-    elif final_score > 200: return 2
-    else: return 1 
 
-# ==========================================
-# 5. DRAWING & MAIN LOOP
-# ==========================================
+def draw_loading(level):
+    screen.fill((20, 20, 20))
+    text = font.render(f'GENERATING LEVEL {level}... (Please Wait)', True, 'white')
+    screen.blit(text, (WIDTH // 2 - 180, HEIGHT // 2))
+    pygame.display.flip()
 
-def draw_game():
-    screen.fill((30, 30, 40))
-    
-    lvl_txt = large_font.render(f"LEVEL {current_level}", True, 'white')
-    screen.blit(lvl_txt, (20, 20))
-    
-    col_score = 'yellow'
-    if score <= 400: col_score = 'red'
-    elif score <= 600: col_score = 'orange'
-    
-    score_txt = font.render(f"Score: {score}", True, col_score)
-    screen.blit(score_txt, (20, 70))
-    
-    algo_txt = font.render("Generator: BFS | Hint: A*", True, (100, 255, 100))
-    screen.blit(algo_txt, (20, 100))
-    
-    info_txt = font.render("R: Restart | H: Hint (-50) | M: Menu", True, 'gray')
-    screen.blit(info_txt, (WIDTH - 400, 30))
 
-    if loading: return []
+def draw_start_menu():
+    screen.fill((20, 20, 30))
+    title = large_font.render('WATER SORT PUZZLE', True, (255, 255, 255))
+    screen.blit(title, (WIDTH // 2 - title.get_width() // 2, HEIGHT // 2 - 120))
 
-    num = len(tubes)
-    w, h = 60, 200
+    start_rect = pygame.Rect(WIDTH // 2 - 100, HEIGHT // 2 - 20, 200, 60)
+    pygame.draw.rect(screen, (40, 120, 200), start_rect, border_radius=8)
+    start_text = font.render('START', True, (255, 255, 255))
+    screen.blit(start_text, (start_rect.x + start_rect.width // 2 - start_text.get_width() // 2,
+                             start_rect.y + start_rect.height // 2 - start_text.get_height() // 2))
+    return start_rect
+
+
+def draw_level_select():
+    screen.fill((18, 18, 18))
+    title = large_font.render('PILIH LEVEL', True, (255, 255, 255))
+    screen.blit(title, (WIDTH // 2 - title.get_width() // 2, 80))
+
+    btns = []
+    btn_width = 100
+    btn_height = 70
     gap = 20
-    total_w = num * w + (num-1) * gap
-    start_x = (WIDTH - total_w) // 2
-    start_y = 250
-    
+    total_w = 5 * btn_width + 4 * gap
+    start_x = WIDTH // 2 - total_w // 2
+    y = HEIGHT // 2 - btn_height // 2
+
+    for i in range(5):
+        r = pygame.Rect(start_x + i * (btn_width + gap), y, btn_width, btn_height)
+        pygame.draw.rect(screen, (50, 150, 200), r, border_radius=8)
+        num_text = font.render(str(i + 1), True, (255, 255, 255))
+        screen.blit(num_text, (r.x + r.width // 2 - num_text.get_width() // 2,
+                               r.y + r.height // 2 - num_text.get_height() // 2))
+        btns.append(r)
+
+    back_r = pygame.Rect(20, 20, 100, 40)
+    pygame.draw.rect(screen, (100, 100, 100), back_r, border_radius=6)
+    back_t = font.render('BACK', True, (255, 255, 255))
+    screen.blit(back_t, (back_r.x + 10, back_r.y + 8))
+    btns.append(back_r)
+
+    return btns
+
+
+def draw_game_interface():
+    global hint_move, selected_tube, stars
+    screen.fill((30, 30, 30))
+
+    # Header
+    level_text = font.render(f'LEVEL: {current_level}', True, 'white')
+    screen.blit(level_text, (20, 20))
+    hint_text = font.render('R: Restart | SPACE: Skip Level (Cheat) | H: Hint (A*)', True, 'gray')
+    screen.blit(hint_text, (WIDTH - 520, 20))
+
+    if loading:
+        return []
+
+    num_tubes = len(tubes)
+    tube_width = 70
+    tube_height = 250
+    gap = 25
+
+    total_width = (num_tubes * tube_width) + ((num_tubes - 1) * gap)
+    start_x = (WIDTH - total_width) // 2
+    start_y = 200
+
     rects = []
-    
-    for i, tube in enumerate(tubes):
-        x = start_x + i * (w + gap)
+
+    for i in range(num_tubes):
+        x = start_x + (i * (tube_width + gap))
         y = start_y
-        
-        if selected_tube == i: y -= 20
-            
-        for idx, color_code in enumerate(tube):
-            c = COLOR_MAP[color_code]
-            h_seg = h / BOTOL_CAPACITY
-            y_seg = y + h - (idx + 1) * h_seg
-            pygame.draw.rect(screen, c, (x+4, y_seg, w-8, h_seg), border_radius=3)
-            
-        color = 'white'
-        thick = 3
-        if selected_tube == i: color = 'yellow'
-        
-        if hint_move:
-            src, dst = hint_move
-            if i == src: color = 'cyan'; thick = 5
-            elif i == dst: color = 'green'; thick = 5
-        
-        rect = pygame.Rect(x, y, w, h)
-        pygame.draw.rect(screen, color, rect, thick, border_radius=8)
-        
-        label = font.render(str(i+1), True, 'gray')
-        screen.blit(label, (x + w//2 - 5, y + h + 5))
-        rects.append((rect, i))
+
+        border_color = (200, 200, 200)
+        thickness = 3
+        if selected_tube == i:
+            border_color = (255, 255, 0)
+            thickness = 5
+            y -= 20
+
+        # VISUALISASI HINT
+        if hint_move is not None:
+            try:
+                src_idx, dst_idx = hint_move
+                if i == src_idx:
+                    border_color = (0, 255, 255)  # Cyan for source
+                    thickness = 6
+                    y -= 10
+                if i == dst_idx:
+                    border_color = (0, 200, 0)    # Green for dest
+                    thickness = 6
+            except Exception:
+                pass
+
+        # 1. Gambar Air
+        for idx, color_code in enumerate(tubes[i]):
+            color = COLOR_MAP.get(color_code, (255, 255, 255))
+            h_unit = tube_height / BOTOL_CAPACITY
+            water_y = (y + tube_height) - ((idx + 1) * h_unit)
+            pygame.draw.rect(screen, color, [int(x + 5), int(water_y), int(tube_width - 10), int(h_unit)], 0, 8)
+
+        # 2. Gambar Tabung
+        tube_rect = pygame.Rect(int(x), int(y), tube_width, tube_height)
+        pygame.draw.rect(screen, border_color, tube_rect, thickness, 8)
+        rects.append(tube_rect)
 
     if game_won:
         s = pygame.Surface((WIDTH, HEIGHT))
-        s.set_alpha(230)
-        s.fill((0,0,0))
-        screen.blit(s, (0,0))
-        
-        draw_text_center("LEVEL COMPLETED!", HEIGHT//2 - 120, 'green', large_font)
-        draw_text_center(f"Final Score: {score}", HEIGHT//2 - 70)
-        
-        # Bintang Visual
-        star_size = 35
-        total_width = stars * (star_size * 2 + 10)
-        start_star_x = WIDTH//2 - total_width // 2 + star_size
-        
-        for i in range(stars):
-            s_size = star_size + math.sin(pygame.time.get_ticks()/300 + i)*2
-            draw_star(screen, start_star_x + i * (star_size * 2 + 15), HEIGHT//2, s_size, (255, 215, 0))
+        s.set_alpha(150)
+        s.fill((0, 0, 0))
+        screen.blit(s, (0, 0))
 
-        if current_level < 5:
-            draw_text_center("Press ENTER for Next Level", HEIGHT//2 + 80, 'white')
-        else:
-            draw_text_center("ALL LEVELS COMPLETED!", HEIGHT//2 + 80, 'gold')
+        msg = large_font.render('LEVEL COMPLETED!', True, (0, 255, 0))
+        sub_msg = font.render('Press ENTER for Next Level', True, 'white')
+        screen.blit(msg, (WIDTH // 2 - 180, HEIGHT // 2 - 50))
+        screen.blit(sub_msg, (WIDTH // 2 - 140, HEIGHT // 2 + 10))
+
+        hint_out = font.render(f"HINT USED: {hint_used}", True, "white")
+        screen.blit(hint_out, (395, 390))
+        
+        hint_out = font.render(f"MOVE: {move_count}", True, "white")
+        screen.blit(hint_out, (410, 420))
+
+        score_text = font.render(f"SCORE: {player_score}", True, "white")
+        screen.blit(score_text, (400, 350))
+
+        if stars > 0:
+            def draw_star(surface, x, y, size, color):
+                pts = [
+                    (int(x), int(y - size)),
+                    (int(x + size * 0.2245), int(y - size * 0.3090)),
+                    (int(x + size), int(y - size * 0.3090)),
+                    (int(x + size * 0.3633), int(y + size * 0.1180)),
+                    (int(x + size * 0.5878), int(y + size)),
+                    (int(x), int(y + size * 0.3819)),
+                    (int(x - size * 0.5878), int(y + size)),
+                    (int(x - size * 0.3633), int(y + size * 0.1180)),
+                    (int(x - size), int(y - size * 0.3090)),
+                    (int(x - size * 0.2245), int(y - size * 0.3090))
+                ]
+                pygame.draw.polygon(surface, color, pts)
+
+            total_width = (stars - 1) * 60
+            for s_idx in range(stars):
+                draw_star(screen, WIDTH // 2 - (total_width // 2) + s_idx * 60, HEIGHT // 2 - 100, 30, (255, 215, 0))
 
     return rects
 
+
+
+def check_victory():
+    for tube in tubes:
+        if len(tube) == 0:
+            continue
+        if len(tube) < BOTOL_CAPACITY:
+            return False
+        first = tube[0]
+        for c in tube:
+            if c != first:
+                return False
+    return True
+
+move_count = 0
+
+def handle_move(src_idx, dst_idx):
+    global player_score, move_count
+    
+    src = tubes[src_idx]
+    dst = tubes[dst_idx]
+
+    if len(src) == 0: return 
+    if len(dst) >= BOTOL_CAPACITY: return 
+
+    src_color = src[-1] 
+    if len(dst) > 0 and dst[-1] != src_color: return 
+
+    amount_to_move = 0
+    for i in range(len(src)-1, -1, -1):
+        if src[i] == src_color: amount_to_move += 1
+        else: break
+    
+    space = BOTOL_CAPACITY - len(dst)
+    final_amount = min(amount_to_move, space)
+
+    for _ in range(final_amount):
+        dst.append(src.pop())
+
+    player_score -= 10     
+    move_count += 1       
+
+
+# ==========================================
+# 3. MAIN LOOP
+# ==========================================
+
 def main():
-    global ui_state, selected_tube, hint_move, score, game_won, tubes, stars
-    
-    running = True
-    rects = []
-    
-    while running:
-        clock.tick(FPS)
-        
+    global current_level, selected_tube, tubes, game_won, hint_move, hint_used, stars, ui_state, player_score, move_count
+
+    run = True
+    ui_state = 'menu'
+
+    while run:
+        timer.tick(FPS)
+
         if ui_state == 'menu':
-            screen.fill((20, 20, 30))
-            draw_text_center("WATER SORT PUZZLE", 150, 'white', large_font)
-            
-            btn = pygame.Rect(WIDTH//2 - 100, 250, 200, 60)
-            pygame.draw.rect(screen, (0, 120, 215), btn, border_radius=10)
-            draw_text_center("START GAME", 270)
-            
-            for i in range(1, 6):
-                r = pygame.Rect(WIDTH//2 - 175 + (i-1)*70, 350, 50, 50)
-                pygame.draw.rect(screen, (60, 60, 60), r, border_radius=5)
-                txt = font.render(str(i), True, 'white')
-                screen.blit(txt, (r.x + 18, r.y + 15))
-                if pygame.mouse.get_pressed()[0]:
-                    mx, my = pygame.mouse.get_pos()
-                    if r.collidepoint((mx, my)):
-                        setup_level(i)
-                        ui_state = 'playing'
-                        pygame.time.delay(200)
+            start_btn = draw_start_menu()
+            level_btns = []
+            game_rects = []
+        elif ui_state == 'level_select':
+            level_btns = draw_level_select()
+            start_btn = None
+            game_rects = []
+        else:  # playing
+            game_rects = draw_game_interface()
+            start_btn = None
+            level_btns = []
 
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT: running = False
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                run = False
+
+            if ui_state == 'menu':
                 if event.type == pygame.MOUSEBUTTONDOWN:
-                    if btn.collidepoint(event.pos):
-                        setup_level(1)
-                        ui_state = 'playing'
+                    if start_btn and start_btn.collidepoint(event.pos):
+                        ui_state = 'level_select'
 
-            pygame.display.flip()
-            
-        elif ui_state == 'playing':
-            rects = draw_game()
-            pygame.display.flip()
-            
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT: running = False
-                
+            elif ui_state == 'level_select':
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    for idx, r in enumerate(level_btns[:-1]): 
+                        if r.collidepoint(event.pos):
+                            chosen = idx + 1
+                            setup_level(chosen)
+                            ui_state = 'playing'
+                            break
+                    if level_btns and level_btns[-1].collidepoint(event.pos):
+                        ui_state = 'menu'
+
+            else:  # playing state events
                 if event.type == pygame.KEYUP:
-                    if event.key == pygame.K_m: ui_state = 'menu'
-                    
-                    if event.key == pygame.K_r: # Restart
+                    if event.key == pygame.K_r:  # Restart
                         tubes = copy.deepcopy(initial_tubes)
                         selected_tube = None
-                        hint_move = None
                         game_won = False
-                        score = 1000 # Reset 1000
-                        
-                    if event.key == pygame.K_SPACE: # Cheat
+                        hint_move = None
+                        hint_used = 0 # Reset hint
+                        stars = 0
+                    
+                    if event.key == pygame.K_ESCAPE:
+                        if ui_state == "playing":
+                            selected_tube = None
+                            game_won = False
+                            ui_state = "level_select"
+                            continue
+
+                    if event.key == pygame.K_SPACE:  # Cheat
                         game_won = True
-                        score = 1000
-                        stars = 5
-                        
-                    if event.key == pygame.K_RETURN and game_won: 
-                        setup_level(min(5, current_level + 1))
-                        
-                    if event.key == pygame.K_h and not game_won: # Hint
-                        if score >= 50: 
-                            res = astar_find_hint(tubes)
-                            if res:
-                                hint_move = res
-                                score -= 50 # PENALTI HINT -50
-                            else: print("No hint.")
+
+                    if event.key == pygame.K_RETURN and game_won:  # Next Level
+                        if current_level < 5:
+                            setup_level(current_level + 1)
                         else:
-                            print("Score not enough!")
-                
+                            print("TAMAT!")
+                            setup_level(1)
+
+                    # - HINT (H)
+                    if event.key == pygame.K_h and not game_won and not loading:
+                        
+                        # 1. CeK Apakah sudah dipakai 3 kali?
+                        if hint_used >= 3:
+                            print(f"GAGAL: Jatah hint habis! Kamu sudah pakai {hint_used}/3 kali.")
+
+                        # 2. Cek Apakah score cukup?
+                        elif player_score < 100:
+                            print(f"GAGAL: Score kamu {player_score}. Butuh 100 untuk Hint!")
+                        
+                        # 3. selain 2 itu, jalankan hint
+                        else:
+                            hint_move = astar_find_hint(tubes)
+                            
+                            if hint_move is None:
+                                print("Hint: tidak ditemukan atau tabung sudah rapi.")
+                            else:
+                                print(f"Hint: tuang dari {hint_move[0]} ke {hint_move[1]}")
+                                player_score -= 100    # kurangi skor 100
+                                hint_used += 1               
+
                 if event.type == pygame.MOUSEBUTTONDOWN and not game_won:
                     pos = event.pos
-                    clicked = -1
-                    for r, idx in rects:
-                        if r.collidepoint(pos): clicked = idx; break
-                    
-                    if clicked != -1:
+                    clicked_idx = -1
+                    for i, rect in enumerate(game_rects):
+                        if rect.collidepoint(pos):
+                            clicked_idx = i
+                            break
+
+                    if clicked_idx != -1:
                         if selected_tube is None:
-                            if tubes[clicked]: selected_tube = clicked
+                            if len(tubes[clicked_idx]) > 0:
+                                selected_tube = clicked_idx
                         else:
-                            if selected_tube == clicked:
+                            if selected_tube == clicked_idx:
                                 selected_tube = None
                             else:
-                                move = (selected_tube, clicked)
-                                valid = valid_moves_from(tubes)
-                                if move in valid:
-                                    tubes = apply_move(tubes, move)
-                                    score -= 5 # PENALTI MOVE -5
-                                    hint_move = None
-                                    if is_goal_state(tubes):
-                                        game_won = True
-                                        stars = calculate_stars(score)
+                                handle_move(selected_tube, clicked_idx)
                                 selected_tube = None
+                                hint_move = None 
+                                
+                                if check_victory():
+                                    game_won = True
+                                    # LOGIKA BINTANG
+                                    # Hint 0 = Bintang 3 (jika skor tinggi)
+                                    if player_score > 850 and hint_used == 0:
+                                        stars = 3
+                                    elif player_score > 650 and hint_used <= 3:
+                                        stars = 2
+                                    else:
+                                        stars = 1
+                                    print(f"Level complete dengan {stars} bintang!")
+
+        pygame.display.flip()
 
     pygame.quit()
 
+
 if __name__ == "__main__":
     main()
-
